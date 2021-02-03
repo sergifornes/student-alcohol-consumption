@@ -1,92 +1,324 @@
 ---
-title: "Trabajo estadística alcohol"
+title: "Análisis predictivo sobre el consumo de alcohol en estudiantes"
 author: "Sergi Fornés"
+lang: "es"
 output:
+  pdf_document:
+    toc: yes
   html_document: default
-  pdf_document: default
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = FALSE, cache = TRUE, message = FALSE, warning = FALSE)
 library(tidyverse)
+library(RColorBrewer)
+library(knitr)
+library(kableExtra)
+library(MASS)
+library(caret)
+library(randomForest)
+library(xgboost)
 ```
 
-
-# DATOS
-
-* [data](https://www.kaggle.com/uciml/student-alcohol-consumption)
-* Hacer el trabajo con Nested Cross Validation para elegir modelo
-* La variable dependiente analizarla como variable cualitativa
-* "pocos datos", por lo que hacer solo train/test data
-
---- Merge que viene con los datos
-d1=read.table("student-mat.csv",sep=";",header=TRUE)
-d2=read.table("student-por.csv",sep=";",header=TRUE)
-
-d3=merge(d1,d2,by=c("school","sex","age","address","famsize","Pstatus","Medu","Fedu","Mjob","Fjob","reason","nursery","internet"))
-print(nrow(d3)) # 382 students
----
-
-Context:
-The data were obtained in a survey of students math and portuguese language courses in secondary school. It contains a lot of interesting social, gender and study information about students. You can use it for some EDA or try to predict students final grade.
-
-Content:
-Attributes for both student-mat.csv (Math course) and student-por.csv (Portuguese language course) datasets:
-
-school - student's school (binary: 'GP' - Gabriel Pereira or 'MS' - Mousinho da Silveira)
-sex - student's sex (binary: 'F' - female or 'M' - male)
-age - student's age (numeric: from 15 to 22)
-address - student's home address type (binary: 'U' - urban or 'R' - rural)
-famsize - family size (binary: 'LE3' - less or equal to 3 or 'GT3' - greater than 3)
-Pstatus - parent's cohabitation status (binary: 'T' - living together or 'A' - apart)
-Medu - mother's education (numeric: 0 - none, 1 - primary education (4th grade), 2 – 5th to 9th grade, 3 – secondary education or 4 – higher education)
-Fedu - father's education (numeric: 0 - none, 1 - primary education (4th grade), 2 – 5th to 9th grade, 3 – secondary education or 4 – higher education)
-Mjob - mother's job (nominal: 'teacher', 'health' care related, civil 'services' (e.g. administrative or police), 'at_home' or 'other')
-Fjob - father's job (nominal: 'teacher', 'health' care related, civil 'services' (e.g. administrative or police), 'at_home' or 'other')
-reason - reason to choose this school (nominal: close to 'home', school 'reputation', 'course' preference or 'other')
-guardian - student's guardian (nominal: 'mother', 'father' or 'other')
-traveltime - home to school travel time (numeric: 1 - 1 hour)
-studytime - weekly study time (numeric: 1 - 10 hours)
-failures - number of past class failures (numeric: n if 1<=n<3, else 4)
-schoolsup - extra educational support (binary: yes or no)
-famsup - family educational support (binary: yes or no)
-paid - extra paid classes within the course subject (Math or Portuguese) (binary: yes or no)
-activities - extra-curricular activities (binary: yes or no)
-nursery - attended nursery school (binary: yes or no)
-higher - wants to take higher education (binary: yes or no)
-internet - Internet access at home (binary: yes or no)
-romantic - with a romantic relationship (binary: yes or no)
-famrel - quality of family relationships (numeric: from 1 - very bad to 5 - excellent)
-freetime - free time after school (numeric: from 1 - very low to 5 - very high)
-goout - going out with friends (numeric: from 1 - very low to 5 - very high)
-Dalc - workday alcohol consumption (numeric: from 1 - very low to 5 - very high)
-Walc - weekend alcohol consumption (numeric: from 1 - very low to 5 - very high)
-health - current health status (numeric: from 1 - very bad to 5 - very good)
-absences - number of school absences (numeric: from 0 to 93)
-These grades are related with the course subject, Math or Portuguese:
-
-G1 - first period grade (numeric: from 0 to 20)
-G2 - second period grade (numeric: from 0 to 20)
-G3 - final grade (numeric: from 0 to 20, output target)
-Additional note: there are several (382) students that belong to both datasets .
-These students can be identified by searching for identical attributes
-that characterize each student, as shown in the annexed R file.
-
-Source Information
-P. Cortez and A. Silva. Using Data Mining to Predict Secondary School Student Performance. In A. Brito and J. Teixeira Eds., Proceedings of 5th FUture BUsiness TEChnology Conference (FUBUTEC 2008) pp. 5-12, Porto, Portugal, April, 2008, EUROSIS, ISBN 978-9077381-39-7.
-
-Fabio Pagnotta, Hossain Mohammad Amran.
-Email:fabio.pagnotta@studenti.unicam.it, mohammadamra.hossain '@' studenti.unicam.it
-University Of Camerino
-
-https://archive.ics.uci.edu/ml/datasets/STUDENT+ALCOHOL+CONSUMPTION
-
-# CÓDIGO
-
-```{r}
-# importo los datos
-
-```
 
 # Introducción
 
+El objetivo de este trabajo es estimar un buen modelo que sea capaz de predecir la cantidad de alcohol que consume un estudiante de secundaria según su información demográfica. Para realizar esto se han usado los datos de una encuesta a estudiantes de matemáticas y de portugués de secundaria. Se pueden encontrar los datos en el siguiente [*link*](https://www.kaggle.com/uciml/student-alcohol-consumption).
+
+Hay un total de 674 alumnos con las siguientes variables:
+
+* `school`: Instituto del estudiante.
+* `sex`: Sexo del estudiante.
+* `age`: Edad del estudiante.
+* `address`: Tipo de zona en la que vive el estudiante. Zona urbana (`U`) o zona rural (`R`).
+* `famsize`: Tamaño de la familia del estudiante. Menos o igual de 3 (`LE3`) o más de 3 (`GT3`).
+* `Pstatus`: Convivencia de los padres del estudiante. Los padres conviven (`T`) o no (`A`).
+* `Medu`: Educación de la madre del estudiante. Ninguna (0), cuarto de primaria (1), tercero de la ESO (2), bachillerato (3) o educación superior (4).
+* `Fedu`: Educación del padre del estudiante. Ninguna (0), cuarto de primaria (1), tercero de la ESO (2), bachillerato (3) o educación superior (4).
+* `Mjob`: Trabajo de la madre del estudiante. Maestra (`teacher`), relacionado con el cuidado (`health`), funcionaria (`services`), tareas domésticas (`at_home`) u otro (`other`).
+* `Fjob`: Trabajo del padre del estudiante. Maestro (`teacher`), relacionado con el cuidado (`health`), funcionario (`services`), tareas domésticas (`at_home`) u otro (`other`).
+* `reason`: Razón de haber elegido la escuela del estudiante. Cerca de casa (`home`), reputación del instituto (`reputation`), preferencia en la formación (`course`) u otra (`other`).
+* `guardian`: Tutor del estudiante. Madre (`mother`), padre (`father`) u otro (`other`).
+* `traveltime`: Duración en horas del trayecto desde la casa del estudiante hasta el instituto.
+* `studytime`: Horas semanales de estudio.
+* `failures`: Número de faltas de asistencia a clase.
+* `schoolsup`: Apoyo educativo adicional.
+* `famsup`: Apoyo educativo familiar.
+* `paid`: Clases de repaso de la asignatura.
+* `activities`: Actividades extraescolares.
+* `nursery`: Asistió a educación preescolar.
+* `higher`: Quiere estudiar educación superior.
+* `internet`: Acceso a internet en casa.
+* `romantic`: Tiene una relación romántica.
+* `famrel`: Calidad de la relación familiar. De peor (1) a mejor (5).
+* `freetime`: Tiempo libre después del instituto. De nada (1) a mucho (5).
+* `goout`: Sale con los amigos. De nada (1) a mucho (5).
+* `Dalc`: Consumo de alcohol entre semana. De nada (1) a mucho (5).
+* `Walc`: Consumo de alcohol los fines de semana. De nada (1) a mucho (5).
+* `health`: Estado de salud actual. De muy mala (1) a muy buena (5).
+* `absences`: Número de ausencias escolares.
+* `G1`: Nota en el primer trimestre de la asignatura. De 0 a 20.
+* `G2`: Nota en el segundo trimestre de la asignatura. De 0 a 20.
+* `G3`: Nota final de la asignatura. De 0 a 20.
+
+Hay dos variables que contienen el consumo de alcohol de los estudiantes, `Dalc` y `Walc`. Se predecirá la variable `Walc` debido a que el consumo los fines de semana seguramente es más significativo que el consumo entre semana. Las demás variables se usarán para estimar la predicción, exceptuando `Dalc`, ya que precisamente se quiere estimar el consumo de alcohol, así que no se añadirá como variable explicativa. Tampoco se añadirá la variable `school` puesto que se quiere hacer una predicción general, y en los datos únicamente hay dos institutos.
+
+Primero de todo se arreglarán los datos para poder trabajar correctamente con ellos. Después se realizará un pequeño análisis descriptivo para observar la distribución de las variables de interés. Una vez hecho esto, se usarán distintas técnicas y se compararán sus resultados para elegir el mejor modelo.
+
+```{r}
+# Se cargan los datos
+table_1 <- read_csv("data/student-mat.csv", col_types = "ffifffffffffiinffffffffffffffnnnn")
+table_2 <- read_csv("data/student-por.csv", col_types = "ffifffffffffiinffffffffffffffnnnn")
+
+# Se juntan las tablas
+data <- full_join(table_1, table_2, by = c("school","sex","age","address","famsize","Pstatus","Medu","Fedu","Mjob","Fjob","reason","nursery","internet","guardian","traveltime","studytime","schoolsup","famsup","activities","higher","romantic","famrel","freetime","goout","Dalc","Walc","health"))
+
+# Se colapsan las variables específicas de cada asignatura y se arreglan las demás variables
+data <- data %>%
+  mutate(failures = rowMeans(cbind(failures.x, failures.y), na.rm = TRUE),
+         paid = as.factor(ifelse(paid.x == "yes" | paid.y == "yes", "yes", "no")),
+         absences = rowMeans(cbind(absences.x, absences.y), na.rm = TRUE),
+         G1 = rowMeans(cbind(G1.x, G1.y), na.rm = TRUE),
+         G2 = rowMeans(cbind(G2.x, G2.y), na.rm = TRUE),
+         G3 = rowMeans(cbind(G3.x, G3.y), na.rm = TRUE)) %>%
+  dplyr::select(-matches("failures."), -matches("paid."), -matches("absences."), -matches("G1."), -matches("G2."), -matches("G3."), -school, -Dalc) %>%
+  mutate(paid = as.factor(ifelse(is.na(paid) | paid == "no", "no", "yes")),
+         sex = factor(sex, labels = c("Mujer", "Hombre")),
+         famsize = ordered(famsize, levels = c("LE3","GT3")),
+         Medu = ordered(Medu, levels = c(0,1,2,3,4)),
+         Fedu = ordered(Fedu, levels = c(0,1,2,3,4)),
+         famrel = ordered(famrel, levels = c(1,2,3,4,5)),
+         freetime = ordered(freetime, levels = c(1,2,3,4,5)),
+         goout = ordered(goout, levels = c(1,2,3,4,5), labels = c("Nada","Poco","Algo","Bastante","Mucho")),
+         Walc = ordered(Walc, levels = c(1,2,3,4,5), labels = c("Nada","Poco","Algo","Bastante","Mucho")),
+         health = ordered(health, levels = c(1,2,3,4,5)))
+```
+
+Los datos vienen en dos tablas distintas, una con la encuesta de los estudiantes de matemáticas y la otra con la encuesta de los estudiantes de portugués. Algunos alumnos se encuentran en las dos tablas, por lo que únicamente queremos contarlos una vez. Se supone que un alumno se encuentra en ambas tablas si se encuentran dos observaciones con todas las variables iguales exceptuando los valores de `failures`, `paid`, `absences`, `G1`, `G2` y `G3`, ya que estas variables son específicas de cada clase, por ejemplo, un mismo alumno puede tener diferentes calificaciones en clase de matemáticas y de portugués. Para estas variables mencionadas anteriormente se tienen muchos valores `NA` debido a que muchos estudiantes no asisten a ambas clases, así que se colapsarán los valores de ambas asignaturas para evitar este problema. Las variables `failures`, `absences`, `G1`, `G2` y `G3` son numéricas, por lo que nos podemos quedar con el valor medio de las dos clases para los alumnos que asisten a ambas. Por otro lado `paid` es categórica, de modo que podemos redefinirla como que un estudiante recibe alguna clase particular, ya sea de matemáticas o de portugués.
+
+
+# Análisis Exploratorio
+
+La variable de interés `Walc` es cualitativa y tiene cinco valores posibles. La mayoría de los estudiantes no consumen mucho alcohol pero igualmente los datos no están muy desequilibrados, la categoría con menos estudiantes contiene más del 5% de los estudiantes. Por lo tanto, se buscará el modelo que mejor consiga clasificar estudiantes en esta dimensión.
+
+```{r}
+ggplot(data) +
+  geom_bar(aes(x = Walc, fill = Walc), color = "black", show.legend = FALSE) +
+  ggtitle("Distribución de los estudiantes por consumo de alcohol") +
+  xlab("Consumo de alcohol los fines de semana") +
+  ylab("Frecuencia") +
+  scale_fill_manual(values = brewer.pal(n = 5, name = "OrRd")) +
+  geom_hline(yintercept = 0, color = "black") +
+  geom_text(aes(label = paste(as.character(round(length(which(Walc == "Nada")) / nrow(data) * 100,1)),"%", sep = "")), x = "Nada", y = length(which(data$Walc == "Nada")) / 2, check_overlap = TRUE) +
+  geom_text(aes(label = paste(as.character(round(length(which(Walc == "Poco")) / nrow(data) * 100,1)),"%", sep = "")), x = "Poco", y = length(which(data$Walc == "Poco")) / 2, check_overlap = TRUE) +
+  geom_text(aes(label = paste(as.character(round(length(which(Walc == "Algo")) / nrow(data) * 100,1)),"%", sep = "")), x = "Algo", y = length(which(data$Walc == "Algo")) / 2, check_overlap = TRUE) +
+  geom_text(aes(label = paste(as.character(round(length(which(Walc == "Bastante")) / nrow(data) * 100,1)),"%", sep = "")), x = "Bastante", y = length(which(data$Walc == "Bastante")) / 2, check_overlap = TRUE) +
+  geom_text(aes(label = paste(as.character(round(length(which(Walc == "Mucho")) / nrow(data) * 100,1)),"%", sep = "")), x = "Mucho", y = length(which(data$Walc == "Mucho")) / 2, check_overlap = TRUE)
+```
+
+A continuación se observará la relación que tiene `Walc` con otras variables. Las variables más influyentes sobre el consumo de alcohol podrían ser el sexo del estudiante, la edad, las calificaciones, y si suele salir con sus amigos.
+
+Efectivamente, el sexo del estudiante está muy relacionado con el consumo de alcohol. Los hombres consumen mucho más alcohol los fines de semana que las mujeres.
+
+```{r}
+ggplot(data) +
+  geom_bar(aes(x = sex, fill = Walc), color = "black", position = "fill") +
+  ggtitle("Consumo de alcohol por sexo") +
+  xlab("Sexo") +
+  ylab("Proporción") +
+  scale_fill_manual(values = brewer.pal(n = 5, name = "OrRd")) +
+  geom_hline(yintercept = 0, color = "black")
+```
+
+En cuanto a la relación con la edad y las calificaciones, los estudiantes consumidores de alcohol parece que se encuentran por el centro de la distribución de notas y uniformemente distribuidos por edad. Por lo que a simple vista no se observa una fuerte relación.
+
+```{r}
+ggplot(data) +
+  geom_jitter(aes(x = age, y = G3, fill = Walc), shape = 21, color = "black") +
+  ggtitle("Consumo de alcohol por edad y calificaciones", "Jitter Plot") +
+  xlab("Edad") +
+  ylab("Calificaciones finales") +
+  scale_fill_manual(values = brewer.pal(n = 5, name = "OrRd")) +
+  ylim(-0.2,20)
+```
+
+Mientras tanto, el efecto de salir con los amigos si que parece ser muy fuerte. En proporción, los estudiantes que más salen con sus amigos beben más.
+
+```{r}
+ggplot(data) +
+  geom_bar(aes(x = goout, fill = Walc), color = "black") +
+  ggtitle("Consumo de alcohol por costumbre de salir con amigos") +
+  xlab("Sale con los amigos") +
+  ylab("Frecuencia") +
+  scale_fill_manual(values = brewer.pal(n = 5, name = "OrRd")) +
+  geom_hline(yintercept = 0, color = "black")
+```
+
+Se ha observado que los diferentes grupos de estudiantes según su consumo de alcohol no están claramente separados por las demás variables, y además los diferentes valores de `Walc` pueden resultar ambiguos, por lo que no se espera estimar un modelo que consiga clasificar correctamente la mayoría de los casos.
+
+
+# Métodos de Clasificación
+
+El principal objetivo de este trabajo es la predicción, por lo que se ajustarán diversos modelos de clasificación y se obtendrá el porcentaje de observaciones correctamente clasificadas de cada uno de ellos, es decir, su precisión. La inferencia y la interpretación no serán de interés. Primero se realizará un Linear Discriminant Analysis, un modelo relativamente sencillo que suele dar buenos resultados a la hora de clasificar distribuciones multinomiales. Después se estimará un modelo más potente, un Random Forest, basado en árboles de decisión. Y por último ajustaremos un Extreme Gradient Boosting, otro algoritmo basado en árboles de decisión pero mucho más potente.
+
+
+## Linear Discriminant Analysis
+
+```{r}
+# Estimación del modelo con Leave-One-Out Cross-Validation
+fit_lda <- lda(Walc ~ ., data = data, CV = TRUE)
+lda_acc <- mean(fit_lda$class == as.character(data$Walc))
+```
+
+Con el objetivo de que no haya sobreajuste en el modelo, este se ha estimado mediante Leave-One-Out Cross-Validation. Una vez ajustado, se han clasificado las observaciones y se ha obtenido la siguiente tabla de confusión:
+
+```{r}
+kable(t(table(fit_lda$class, data$Walc)), align = c("c","c","c","c","c")) %>%
+  kable_styling() %>%
+  add_header_above(c(" " = 1, "Walc Predicho" = 5))
+```
+
+En la cual tenemos los valores actuales de la variable `Walc` en las filas y los valores predichos en las columnas. Con esta tabla se puede calcular que el porcentaje de observaciones correctamente clasificadas es del `r round(100*lda_acc,2)`%.
+
+
+## Random Forest
+
+```{r}
+# Se dividen los datos entre train y test
+set.seed(1111)
+train_i <- createDataPartition(data$Walc, p = 0.8, list = FALSE)
+train_data <- data[train_i,]
+test_data <- data[-train_i,]
+# Se crean las divisiones para hacer 5-Fold Cross-Validation
+train_out <- createFolds(train_data$Walc, k = 5, returnTrain = TRUE)
+test_out <- lapply(train_out, function (x) {(1:nrow(train_data))[-x]})
+# Se eligen los diferentes valores que se quieren probar
+rf_grid <- expand.grid(mtry = c(2,3,4,6,9,12))
+# Se crea la parrilla para ver el mejor valor de cada caja
+rf_tune <- matrix(nrow = 5, ncol = 1)
+dimnames(rf_tune) = list(c("k1", "k2", "k3", "k4", "k5"), c("mtry"))
+# Se crea una variable para guardar la precisión del modelo
+rf_acc <- 0
+# Se especifican los parámetros que se usarán para estimar los modelos
+fitControl <- trainControl(method = "cv", number = 5)
+# Se hace el 5-Fold Cross-Validation
+for (i in 1:5) {
+  # Se elige la caja
+  train_in <- data[train_out[[i]],]
+  test_in <- data[test_out[[i]],]
+  # Se estima el modelo de cada caja
+  fit_rf <- train(Walc ~ .,
+                  data = train_in,
+                  method = "rf",
+                  trControl = fitControl,
+                  tuneGrid = rf_grid,
+                  metric = "Accuracy",
+                  distribution = "multinomial")
+  # Se actualiza la variable que guarda el hiperparámetro óptimo
+  rf_tune[i,1] <- as.matrix(fit_rf$bestTune)
+}
+```
+
+El modelo de Random Forest se ha ajustado con Nested Cross-Validation. Para ello, primero se han dividido las observaciones entre datos de entrenamiento (80% de las observaciones) y datos de validación (20% restante). Después se han dividido los datos de entrenamiento en 5 cajas de aproximadamente el mismo tamaño para realizar un 5-Fold Cross-Validation, con el objetivo de encontrar el hiperparámetro `mtry` del Random Forest óptimo. Para ello se realiza, para cada caja, una estimación del modelo Random Forest con diferentes valores de `mtry`. Se han elegido como posibles valores $\{2,3,4,6,9,12\}$. De entre todos los modelos de una misma caja `k`, los valores con los que se estima el mejor modelo son:
+
+```{r}
+kable(rf_tune, align = c("c","c")) %>%
+  kable_styling()
+# Se estima el modelo con el hiperparámetro óptimo y los datos train
+fit_rf <- randomForest(Walc ~ ., data = train_data, mtry = 9, ntree = 1000)
+# Se predicen los datos test
+pred_rf <- predict(fit_rf, test_data)
+# Se compara la predicción con el valor real
+rf_acc <- mean(as.character(pred_rf) == as.character(test_data$Walc))
+```
+
+El valor óptimo del hiperparámetro podría ser $\text{mtry} = 9$, por lo que se estima el Random Forest usando este valor y el total de datos de entrenamiento para así poder conocer la precisión real del algoritmo usando Cross-Validation. Finalmente se predicen los datos de validación y se comparan con los valores reales, obteniéndose un porcentaje de observaciones correctamente clasificadas del `r round(100*rf_acc,2)`%.
+
+
+## Extreme Gradient Boosting
+
+```{r}
+# Se dividen los datos entre train y test
+set.seed(1111)
+train_i <- createDataPartition(data$Walc, p = 0.8, list = FALSE)
+train_data <- data[train_i,]
+test_data <- data[-train_i,]
+# Se crean las divisiones para hacer 5-Fold Cross-Validation
+train_out <- createFolds(train_data$Walc, k = 5, returnTrain = TRUE)
+test_out <- lapply(train_out, function (x) {(1:nrow(train_data))[-x]})
+# Se eligen los diferentes valores que se quieren probar
+xgb_grid <- expand.grid(nrounds=c(50),
+  max_depth = c(3, 6, 10),
+  eta = c(0.01, 0.1, 0.3),
+  gamma = c(0.01),
+  colsample_bytree = c(0.5, 1),
+  min_child_weight = c(0, 1),
+  subsample = c(0.5, 1))
+# Se crea la parrilla para ver los mejores valores de cada caja
+xgb_tune <- matrix(nrow = 5, ncol = 7)
+dimnames(xgb_tune) = list(c("k1", "k2", "k3", "k4", "k5"), c("nrounds", "max_depth", "eta", "gamma", "colsample_bytree", "min_child_weight", "subsample"))
+# Se crea una variable para guardar la precisión del modelo
+xgb_acc <- 0
+# Se especifican los parámetros que se usarán para estimar los modelos
+fitControl <- trainControl(method = "cv", number = 5)
+# Se hace el 5-Fold Cross-Validation
+for (i in 1:5) {
+  # Se elige la caja
+  train_in <- data[train_out[[i]],]
+  test_in <- data[test_out[[i]],]
+  # Se estima el modelo de cada caja
+  fit_xgb <- train(Walc ~ ., data = train_in, method = "xgbTree", trControl = fitControl, tuneGrid = xgb_grid, metric = "Accuracy")
+  # Se actualiza la variable que guarda el hiperparámetro óptimo
+  xgb_tune[i,] <- as.matrix(fit_xgb$bestTune)
+}
+```
+
+Para realizar la estimación del modelo de Extreme Gradient Boosting se ha usado la misma metodología de Nested Cross-Validation que en el apartado anterior, pero en este caso se tienen que elegir los hiperparámetros del Extreme Gradient Boosting. En la siguiente tabla se observan los diferentes valores que se han probado para la optimización de los hiperparámetros:
+
+Hiperparámetro | Valores
+----|:----:
+`nrounds` | {50}
+`max_depth` | {3, 6, 10}
+`eta` | {0.01, 0.1, 0.3}
+`gamma` | {0.01}
+`colsample_bytree` | {0.5, 1}
+`min_child_weight` | {0, 1}
+`subsample` | {0.5, 1}
+
+Los mejores modelos de cada caja `k` tienen los siguientes hiperparámetros:
+
+```{r}
+kable(xgb_tune, align = c("c","c","c","c","c","c","c","c")) %>%
+  kable_styling()
+# Se estima el modelo con los hiperparámetros óptimos y los datos train
+xgb_bst_grid <- expand.grid(nrounds=c(50),
+  max_depth = c(3),
+  eta = c(0.01),
+  gamma = c(0.01),
+  colsample_bytree = c(1),
+  min_child_weight = c(1),
+  subsample = c(0.5))
+fit_xgb <- train(Walc ~ ., data = train_data, method = "xgbTree", tuneGrid = xgb_bst_grid, metric = "Accuracy")
+# Se predicen los datos test
+pred_xgb <- predict(fit_xgb, test_data)
+# Se compara la predicción con el valor real
+xgb_acc <- mean(as.character(pred_xgb) == as.character(test_data$Walc))
+```
+
+Se puede observar que los valores de la caja 1 son los más comunes entre las cajas, por lo que se usarán estos en la estimación del modelo final. Tras ajustar el modelo con todos los datos de entrenamiento y los anteriores hiperparámetros, se utiliza este Extreme Gradient Boosting para predecir los datos de validación. Finalmente se comparan las predicciones con los valores reales y se obtiene que un `r round(100*xgb_acc,2)`% de las observaciones han sido correctamente clasificadas.
+
+
+# Conclusiones
+
+Una vez se han realizado los modelos y conocemos su precisión, se pueden comparar para elegir el mejor. A la hora de compararlos también se debe tener en cuenta el modelo trivial que clasificaría todas las observaciónes al mayor grupo. En este caso, ese modelo predeciría que ningún alumno consume alcohol, por lo que clasificaría correctamente un 38.13% de las observaciones.
+
+Modelo | Precisión
+-------|:---------:
+Trivial | 38.13%
+Linear Discriminant Analysis | `r round(100*lda_acc,2)`%
+Random Forest | `r round(100*rf_acc,2)`%
+Extreme Gradient Boosting | `r round(100*xgb_acc,2)`%
+
+En la tabla anterior se puede observar como el modelo Linear Discriminant Analysis es muy malo, incluso el modelo trivial lo hace mejor. Los modelos basados en árboles predicen prácticamente con la misma precisión, y ambos lo hacen ligeramente mejor que el modelo trivial. Pero aunque la diferencia sea mínima, el Random Forest ha clasificado mejor que el Extreme Gradient Boosting. Por esto, se tendría que ajustar un modelo Random Forest con $\text{mtry} = 9$ y utilizando los datos de todas las observaciones para conseguir predecir de la mejor manera el consumo de alcohol los fines de semana de alumnos de secundaria.
+
+Realmente la precisión del modelo es muy pobre, seguramente sea debido a la poca cantidad de observaciones y a la naturaleza de los datos. Las encuestas con tantas respuestas cualitativas suelen estar sesgadas y además la variable dependiente tiene muchos valores posibles.

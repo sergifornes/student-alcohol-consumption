@@ -1,0 +1,8 @@
+\babel@toc {spanish}{}
+\contentsline {section}{Introducción}{1}{section*.2}%
+\contentsline {section}{Análisis Exploratorio}{2}{section*.3}%
+\contentsline {section}{Métodos de Clasificación}{6}{section*.4}%
+\contentsline {subsection}{Linear Discriminant Analysis}{6}{section*.5}%
+\contentsline {subsection}{Random Forest}{7}{section*.6}%
+\contentsline {subsection}{Extreme Gradient Boosting}{7}{section*.7}%
+\contentsline {section}{Conclusiones}{8}{section*.8}%
