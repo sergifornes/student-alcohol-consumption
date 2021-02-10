@@ -17,7 +17,6 @@ library(kableExtra)
 library(MASS)
 library(caret)
 library(randomForest)
-library(xgboost)
 ```
 
 
@@ -319,6 +318,22 @@ Linear Discriminant Analysis | `r round(100*lda_acc,2)`%
 Random Forest | `r round(100*rf_acc,2)`%
 Extreme Gradient Boosting | `r round(100*xgb_acc,2)`%
 
-En la tabla anterior se puede observar como el modelo Linear Discriminant Analysis es muy malo, incluso el modelo trivial lo hace mejor. Los modelos basados en árboles predicen prácticamente con la misma precisión, y ambos lo hacen ligeramente mejor que el modelo trivial. Pero aunque la diferencia sea mínima, el Random Forest ha clasificado mejor que el Extreme Gradient Boosting. Por esto, se tendría que ajustar un modelo Random Forest con $\text{mtry} = 9$ y utilizando los datos de todas las observaciones para conseguir predecir de la mejor manera el consumo de alcohol los fines de semana de alumnos de secundaria.
+En la tabla anterior se puede observar como el modelo Linear Discriminant Analysis es muy malo, incluso el modelo trivial lo hace mejor. Los modelos basados en árboles predicen prácticamente con la misma precisión, y ambos lo hacen ligeramente mejor que el modelo trivial. Pero aunque la diferencia sea mínima, el Random Forest ha clasificado mejor que el Extreme Gradient Boosting. Por esto, se vuelve a ajustar un modelo Random Forest con $\text{mtry} = 9$ y todas las observaciones para conseguir predecir de la mejor manera el consumo de alcohol los fines de semana de alumnos de secundaria.
 
-Realmente la precisión del modelo es muy pobre, seguramente sea debido a la poca cantidad de observaciones y a la naturaleza de los datos. Las encuestas con tantas respuestas cualitativas suelen estar sesgadas y además la variable dependiente tiene muchos valores posibles.
+Una vez estimado el Random Forest, se puede obtener la disminución media de GINI de las variables explicativas. Esta es una medida de la importancia global de la variable y representa la disminución de la impureza de los nodos producida por la varable en cuestión. A mayor valor, mayor importancia tiene la variable a la hora de hacer la predicción. En la tabla siguiente se pueden observar estos índices.
+
+```{r}
+# Se estima el modelo con el hiperparámetro óptimo y todos los datos
+fitRfFinal <- randomForest(Walc ~ ., data = data, mtry = 9, ntree = 1000)
+
+# Se compara la importancia de las variables
+kable(arrange(tibble(Variable = row.names(fitRfFinal$importance),
+                     `Disminución Media de GINI` = round(fitRfFinal$importance, 3)),
+              desc(`Disminución Media de GINI`)),
+      align = c("l", "c")) %>%
+  kable_styling()
+```
+
+Las variables con mayor importancia son las ausencias escolares, la costumbre de salir con los amigos y las notas. Mientras que la intención de realizar estudios superiores, la convivencia de los padres y el apoyo educativo son las que menos influyen.
+
+Igualmente hay que tener cuidado con estas conclusiones debido a la pobre precisión del modelo. Esto seguramente es debido a la poca cantidad de observaciones y a la naturaleza de los datos. Las encuestas con tantas respuestas cualitativas suelen estar sesgadas y además la variable dependiente tiene muchos valores posibles.
