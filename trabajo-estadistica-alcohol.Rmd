@@ -328,7 +328,7 @@ fitRfFinal <- randomForest(Walc ~ ., data = data, mtry = 9, ntree = 1000)
 
 # Se compara la importancia de las variables
 kable(arrange(tibble(Variable = row.names(fitRfFinal$importance),
-                     `Disminución Media de GINI` = round(fitRfFinal$importance, 3)),
+                     `Disminución Media de GINI` = round(fitRfFinal$importance, 2)),
               desc(`Disminución Media de GINI`)),
       align = c("l", "c")) %>%
   kable_styling()
